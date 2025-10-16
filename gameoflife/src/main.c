@@ -65,6 +65,7 @@ void setup() {
 	for(int i = 0; i < NUM_ROWS; i++) {
 		for(int j = 0; j < NUM_COLS; j++) {
 			colony[i][j].alive = rand() % 10 > 8 ? true : false;
+			colony[i][j].changed = false;
 			colony[i][j].r.x = j * CELL_WIDTH;
 			colony[i][j].r.y = i * CELL_HEIGHT;
 			colony[i][j].r.w = CELL_WIDTH;
@@ -74,6 +75,64 @@ void setup() {
 	}
 
 	SDL_AddTimer(TIMER_DELAY, next_generation, NULL);
+	SDL_AddEventWatch(resize_event, NULL);
+
+}
+
+int resize_event(void *userdata, SDL_Event* event) {
+  if (event->type == SDL_WINDOWEVENT) {
+    if (event->window.event == SDL_WINDOWEVENT_RESIZED) {
+		int new_width = event->window.data1;
+		int new_height = event->window.data2;
+
+		window_width = new_width;
+		window_height = new_height;
+
+		int new_cols = window_width / CELL_WIDTH;
+		int new_rows = window_height / CELL_HEIGHT;
+
+		// allocate new colony
+		struct cell **new_colony = calloc(new_rows, sizeof(struct cell *));
+		for (int i = 0; i < new_rows; i++) {
+			new_colony[i] = calloc(new_cols, sizeof(struct cell));
+		}
+
+		// copy overlapping data from old colony
+		int min_rows = (new_rows < num_rows) ? new_rows : num_rows;
+		int min_cols = (new_cols < num_cols) ? new_cols : num_cols;
+
+		for (int i = 0; i < min_rows; i++) {
+			for (int j = 0; j < min_cols; j++) {
+				new_colony[i][j].alive = colony[i][j].alive;
+			}
+		}
+
+		// free old colony
+		for (int i = 0; i < num_rows; i++) {
+			free(colony[i]);
+		}
+		free(colony);
+
+		colony = new_colony;
+		num_cols = new_cols;
+		num_rows = new_rows;
+
+		// recalculate rectangle positions and sizes
+		for (int i = 0; i < num_rows; i++) {
+			for (int j = 0; j < num_cols; j++) {
+				colony[i][j].r.x = j * CELL_WIDTH;
+				colony[i][j].r.y = i * CELL_HEIGHT;
+				colony[i][j].r.w = CELL_WIDTH;
+				colony[i][j].r.h = CELL_HEIGHT;
+			}
+		}
+
+		// printf("resized colony to %d rows x %d cols\n", num_rows, num_cols);
+		update();
+    	render();
+    }
+  }
+  return 1;
 }
 
 void process_input() {
@@ -89,52 +148,7 @@ void process_input() {
 				break;
 			case SDL_WINDOWEVENT:
 				if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
-					int new_width = event.window.data1;
-					int new_height = event.window.data2;
-
-					window_width = new_width;
-					window_height = new_height;
-
-					int new_cols = window_width / CELL_WIDTH;
-					int new_rows = window_height / CELL_HEIGHT;
-
-					// allocate new colony
-					struct cell **new_colony = calloc(new_rows, sizeof(struct cell *));
-					for (int i = 0; i < new_rows; i++) {
-						new_colony[i] = calloc(new_cols, sizeof(struct cell));
-					}
-
-					// copy overlapping data from old colony
-					int min_rows = (new_rows < num_rows) ? new_rows : num_rows;
-					int min_cols = (new_cols < num_cols) ? new_cols : num_cols;
-
-					for (int i = 0; i < min_rows; i++) {
-						for (int j = 0; j < min_cols; j++) {
-							new_colony[i][j].alive = colony[i][j].alive;
-						}
-					}
-
-					// free old colony
-					for (int i = 0; i < num_rows; i++) {
-						free(colony[i]);
-					}
-					free(colony);
-
-					colony = new_colony;
-					num_cols = new_cols;
-					num_rows = new_rows;
-
-					// recalculate rectangle positions and sizes
-					for (int i = 0; i < num_rows; i++) {
-						for (int j = 0; j < num_cols; j++) {
-							colony[i][j].r.x = j * CELL_WIDTH;
-							colony[i][j].r.y = i * CELL_HEIGHT;
-							colony[i][j].r.w = CELL_WIDTH;
-							colony[i][j].r.h = CELL_HEIGHT;
-						}
-					}
-
-					// printf("resized colony to %d rows x %d cols\n", num_rows, num_cols);
+					
 				}
 				break;
 
@@ -219,9 +233,10 @@ void update() {
 		// printf("mx: %d, my: %d\n", mouse_x, mouse_y);
 		// printf("x: %d, y: %d\n", x, y);
 		
-		if (x >= 0 && x < num_cols && y >= 0 && y < num_rows){
+		if (x >= 0 && x < num_cols && y >= 0 && y < num_rows && colony[y][x].changed == false){
 			// printf("alive: %d -> %d\n\n", (int)colony[y][x].alive, (int)!colony[y][x].alive);
 			colony[y][x].alive = !colony[y][x].alive;
+			colony[y][x].changed = true;
 		}
 	}
 
@@ -251,6 +266,7 @@ void destroy_window() {
 	}
 	if(colony) free(colony);
 
+	printf("destroction\n");
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_Quit();

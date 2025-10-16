@@ -23,7 +23,11 @@
 
 struct cell {
 	bool alive;
+	bool changed;
 	SDL_Rect r;
 };
 
 unsigned int next_generation(unsigned int a, void* p);
+int resize_event(void *userdata, SDL_Event* event);
+void update();
+void render();
