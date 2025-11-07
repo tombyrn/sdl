@@ -55,7 +55,7 @@ int initialize_window(void) {
 		SDL_WINDOWPOS_CENTERED,
 		SCREEN_WIDTH,
 		SCREEN_HEIGHT,
-		0
+		SDL_WINDOW_RESIZABLE
 	);
 
 	if(window == NULL) {
@@ -73,6 +73,7 @@ int initialize_window(void) {
 }
 
 void setup() {
+	// setup canvas
 	canvas.rows = 12;
 	canvas.cols = 12;
 	canvas.pixel_size = 50;
@@ -142,7 +143,6 @@ void setup() {
 	decrease_cols.clicked = false;
 	
 
-
 	// fill the texture with white pixels
 	SDL_SetRenderTarget(renderer, canvas.texture);
 	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
@@ -154,6 +154,55 @@ void check_button_click(struct button* b) {
 	if(mouse_x > b->rect.x && mouse_x < b->rect.x + b->rect.w &&
 	   mouse_y > b->rect.y && mouse_y < b->rect.y + b->rect.h)
 		b->clicked = true;
+}
+
+void resize_canvas_grid(int n_rows, int n_cols) {
+	// allocate new grid
+	struct pixel** n_grid = calloc(n_rows, sizeof(struct pixel*));
+	for(int i = 0; i < n_rows; i++) {
+		n_grid[i] = calloc(n_cols, sizeof(struct pixel));
+		for(int j = 0; j < n_cols; j++) {
+			// copy from old grid when possible
+			if(i < canvas.rows && j < canvas.cols)
+				n_grid[i][j] = canvas.grid[i][j];
+			else {
+				n_grid[i][j].c.r = 255;
+				n_grid[i][j].c.g = 255;
+				n_grid[i][j].c.b = 255;
+				n_grid[i][j].c.a = SDL_ALPHA_OPAQUE;
+				n_grid[i][j].rect.w = canvas.pixel_size;
+				n_grid[i][j].rect.h = canvas.pixel_size;
+				n_grid[i][j].rect.x = j * canvas.pixel_size;
+				n_grid[i][j].rect.y = i * canvas.pixel_size;
+			}
+		}
+	}
+
+	// free old grid
+	for(int i = 0; i < canvas.rows; i++) 
+		free(canvas.grid[i]);
+	free(canvas.grid);
+
+	// update canvas struct
+	canvas.grid = n_grid;
+	canvas.rows = n_rows;
+	canvas.cols = n_cols;
+	
+	// recreate texture with new grid
+	SDL_DestroyTexture(canvas.texture);
+	canvas.texture = SDL_CreateTexture(
+		renderer,
+		SDL_PIXELFORMAT_RGBA8888,
+		SDL_TEXTUREACCESS_TARGET,
+		canvas.cols * canvas.pixel_size,
+		canvas.rows * canvas.pixel_size
+	);
+
+	SDL_SetRenderTarget(renderer, canvas.texture);
+	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+	SDL_RenderClear(renderer);
+	SDL_SetRenderTarget(renderer, NULL);
+
 }
 
 void process_input() {
@@ -190,12 +239,13 @@ void update() {
 	if(time_to_wait > 0 && time_to_wait <= MS_PER_FRAME)
 		SDL_Delay(time_to_wait);
 
+	// draw to canvas if neededs
 	if(canvas.is_drawing) {
 		// map mouse position to canvas texture coordinates
 		int rel_x = mouse_x - canvas.rect.x;
 		int rel_y = mouse_y - canvas.rect.y;
 
-		// only draw if inside the canvas rect
+		// only draw if mouse is inside the canvas rect
 		if(rel_x >= 0 && rel_x < canvas.rect.w && rel_y >= 0 && rel_y < canvas.rect.h) {
 			// scale mouse coords to texture pixel coords
 			float scale_x = (float)(canvas.cols * canvas.pixel_size) / (float)canvas.rect.w;
@@ -215,211 +265,23 @@ void update() {
 		}
 	}
 		
-
+	// handle button clicks
 	if(increase_rows.clicked) {
-
-		canvas.rows++;
-
-		// make new grid
-		struct pixel** new_grid = calloc(canvas.rows, sizeof(struct pixel*));
-
-		for(int i = 0; i < canvas.rows; i++) {
-			new_grid[i] = calloc(canvas.cols, sizeof(struct pixel));
-			for(int j = 0; j < canvas.cols; j++) {
-				// copy old grid over
-				if(i != canvas.rows-1) {
-					new_grid[i][j].c.r = canvas.grid[i][j].c.r;
-					new_grid[i][j].c.g = canvas.grid[i][j].c.g;
-					new_grid[i][j].c.b = canvas.grid[i][j].c.b;
-					new_grid[i][j].c.a = canvas.grid[i][j].c.a;
-					new_grid[i][j].rect.w = canvas.grid[i][j].rect.w;
-					new_grid[i][j].rect.h = canvas.grid[i][j].rect.h;
-					new_grid[i][j].rect.x = canvas.grid[i][j].rect.x;
-					new_grid[i][j].rect.y = canvas.grid[i][j].rect.y;
-
-				}
-				else {
-					new_grid[i][j].c.r = 255;
-					new_grid[i][j].c.g = 255;
-					new_grid[i][j].c.b = 255;
-					new_grid[i][j].c.a = SDL_ALPHA_OPAQUE;
-					new_grid[i][j].rect.w = canvas.pixel_size;
-					new_grid[i][j].rect.h = canvas.pixel_size;
-					new_grid[i][j].rect.x = j * canvas.pixel_size;
-					new_grid[i][j].rect.y = i * canvas.pixel_size;
-
-				}
-
-			}
-		}
-
-		// free old grid
-		for(int i = 0; i < canvas.rows-1; i++) {
-			free(canvas.grid[i]);
-		}
-		free(canvas.grid);
-		
-		canvas.grid = new_grid;
-		for(int i = 0; i < canvas.rows-1; i++) {
-			canvas.grid[i] = new_grid[i];
-		}
-
-		SDL_DestroyTexture(canvas.texture);
-		canvas.texture = SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,canvas.cols * canvas.pixel_size,canvas.rows * canvas.pixel_size);
-
-		SDL_SetRenderTarget(renderer, canvas.texture);
-		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-		SDL_RenderClear(renderer);
-		SDL_SetRenderTarget(renderer, NULL);
-
+		resize_canvas_grid(canvas.rows+1, canvas.cols);
 		increase_rows.clicked = false;
 	}
 	if(canvas.rows > 1 && decrease_rows.clicked) {
-
-		canvas.rows--;
-
-		// make new grid
-		struct pixel** new_grid = calloc(canvas.rows, sizeof(struct pixel*));
-
-		for(int i = 0; i < canvas.rows; i++) {
-			new_grid[i] = calloc(canvas.cols, sizeof(struct pixel));
-			for(int j = 0; j < canvas.cols; j++) {
-				// copy old grid over
-				new_grid[i][j].c.r = canvas.grid[i][j].c.r;
-				new_grid[i][j].c.g = canvas.grid[i][j].c.g;
-				new_grid[i][j].c.b = canvas.grid[i][j].c.b;
-				new_grid[i][j].c.a = canvas.grid[i][j].c.a;
-				new_grid[i][j].rect.w = canvas.grid[i][j].rect.w;
-				new_grid[i][j].rect.h = canvas.grid[i][j].rect.h;
-				new_grid[i][j].rect.x = canvas.grid[i][j].rect.x;
-				new_grid[i][j].rect.y = canvas.grid[i][j].rect.y;
-
-			}
-		}
-
-		// free old grid
-		for(int i = 0; i < canvas.rows+1; i++) {
-			free(canvas.grid[i]);
-		}
-		free(canvas.grid);
-		
-		canvas.grid = new_grid;
-		for(int i = 0; i < canvas.rows; i++) {
-			canvas.grid[i] = new_grid[i];
-		}
-
-		SDL_DestroyTexture(canvas.texture);
-		canvas.texture = SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,canvas.cols * canvas.pixel_size,canvas.rows * canvas.pixel_size);
-
-		SDL_SetRenderTarget(renderer, canvas.texture);
-		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-		SDL_RenderClear(renderer);
-		SDL_SetRenderTarget(renderer, NULL);
-
+		resize_canvas_grid(canvas.rows-1, canvas.cols);
 		decrease_rows.clicked = false;
 	}
 	if(increase_cols.clicked) {
-
-			canvas.cols++;
-
-			// make new grid
-			struct pixel** new_grid = calloc(canvas.rows, sizeof(struct pixel*));
-
-			for(int i = 0; i < canvas.rows; i++) {
-				new_grid[i] = calloc(canvas.cols, sizeof(struct pixel));
-				for(int j = 0; j < canvas.cols; j++) {
-					// copy old grid over
-					if(j != canvas.cols-1) {
-						new_grid[i][j].c.r = canvas.grid[i][j].c.r;
-						new_grid[i][j].c.g = canvas.grid[i][j].c.g;
-						new_grid[i][j].c.b = canvas.grid[i][j].c.b;
-						new_grid[i][j].c.a = canvas.grid[i][j].c.a;
-						new_grid[i][j].rect.w = canvas.grid[i][j].rect.w;
-						new_grid[i][j].rect.h = canvas.grid[i][j].rect.h;
-						new_grid[i][j].rect.x = canvas.grid[i][j].rect.x;
-						new_grid[i][j].rect.y = canvas.grid[i][j].rect.y;
-
-					}
-					else {
-						new_grid[i][j].c.r = 255;
-						new_grid[i][j].c.g = 255;
-						new_grid[i][j].c.b = 255;
-						new_grid[i][j].c.a = SDL_ALPHA_OPAQUE;
-						new_grid[i][j].rect.w = canvas.pixel_size;
-						new_grid[i][j].rect.h = canvas.pixel_size;
-						new_grid[i][j].rect.x = j * canvas.pixel_size;
-						new_grid[i][j].rect.y = i * canvas.pixel_size;
-
-					}
-
-				}
-			}
-
-			// free old grid
-			for(int i = 0; i < canvas.rows; i++) {
-				free(canvas.grid[i]);
-			}
-			free(canvas.grid);
-			
-			canvas.grid = new_grid;
-			for(int i = 0; i < canvas.rows; i++) {
-				canvas.grid[i] = new_grid[i];
-			}
-
-			SDL_DestroyTexture(canvas.texture);
-			canvas.texture = SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,canvas.cols * canvas.pixel_size,canvas.rows * canvas.pixel_size);
-
-			SDL_SetRenderTarget(renderer, canvas.texture);
-			SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-			SDL_RenderClear(renderer);
-			SDL_SetRenderTarget(renderer, NULL);
-
-			increase_cols.clicked = false;
-		}
-		if(canvas.cols > 1 && decrease_cols.clicked) {
-
-			canvas.cols--;
-
-			// make new grid
-			struct pixel** new_grid = calloc(canvas.rows, sizeof(struct pixel*));
-
-			for(int i = 0; i < canvas.rows; i++) {
-				new_grid[i] = calloc(canvas.cols, sizeof(struct pixel));
-				for(int j = 0; j < canvas.cols; j++) {
-					// copy old grid over
-					new_grid[i][j].c.r = canvas.grid[i][j].c.r;
-					new_grid[i][j].c.g = canvas.grid[i][j].c.g;
-					new_grid[i][j].c.b = canvas.grid[i][j].c.b;
-					new_grid[i][j].c.a = canvas.grid[i][j].c.a;
-					new_grid[i][j].rect.w = canvas.grid[i][j].rect.w;
-					new_grid[i][j].rect.h = canvas.grid[i][j].rect.h;
-					new_grid[i][j].rect.x = canvas.grid[i][j].rect.x;
-					new_grid[i][j].rect.y = canvas.grid[i][j].rect.y;
-
-				}
-			}
-
-			// free old grid
-			for(int i = 0; i < canvas.rows; i++) {
-				free(canvas.grid[i]);
-			}
-			free(canvas.grid);
-			
-			canvas.grid = new_grid;
-			for(int i = 0; i < canvas.rows; i++) {
-				canvas.grid[i] = new_grid[i];
-			}
-
-			SDL_DestroyTexture(canvas.texture);
-			canvas.texture = SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_TARGET,canvas.cols * canvas.pixel_size,canvas.rows * canvas.pixel_size);
-
-			SDL_SetRenderTarget(renderer, canvas.texture);
-			SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-			SDL_RenderClear(renderer);
-			SDL_SetRenderTarget(renderer, NULL);
-
-			decrease_cols.clicked = false;
-		}
+		resize_canvas_grid(canvas.rows, canvas.cols+1);
+		increase_cols.clicked = false;
+	}
+	if(canvas.cols > 1 && decrease_cols.clicked) {
+		resize_canvas_grid(canvas.rows, canvas.cols-1);
+		decrease_cols.clicked = false;
+	}
 
 	last_frame_time = SDL_GetTicks();
 }
@@ -442,7 +304,6 @@ void render() {
 
 	// render the canvas texture to the screen (stretches/scales to window)
 	SDL_RenderCopy(renderer, canvas.texture, NULL, &canvas.rect);
-
 
 	// render buttons
 	SDL_SetRenderDrawColor(renderer, 211, 211, 211, 255);

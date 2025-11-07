@@ -1,10 +1,10 @@
 all: build run
 
 build:
-	gcc -O3 -Wall -g -std=c99 ./src/main.c -lSDL2 -o game -lSDL2_image
+	gcc -O3 -Wall -g -std=c99 ./src/main.c -lSDL2 -o draw -lSDL2_image
 
 run:
-	./game
+	./draw
 
 clean:
-	rm -rf game game.dSYM
+	rm -rf draw draw.dSYM
