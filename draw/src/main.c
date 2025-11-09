@@ -11,6 +11,11 @@ struct color {
 	int r, g, b, a;
 };
 
+struct button {
+	SDL_Rect rect;
+	bool clicked;
+};
+
 struct pixel {
 	struct color c;
 	SDL_Rect rect;
@@ -26,10 +31,17 @@ struct canvas {
 	SDL_Texture* texture;
 } canvas;
 
-struct button {
-	SDL_Rect rect;
-	bool clicked;
+struct swatch {
+	struct button b;
+	struct color c;
 };
+
+struct palette {
+	struct swatch* colors;
+	SDL_Rect container;
+	int num_colors;
+} palette;
+
 
 struct color chosen_color;
 
@@ -141,7 +153,64 @@ void setup() {
 	decrease_cols.rect.w = 25;
 	decrease_cols.rect.h = 15;
 	decrease_cols.clicked = false;
-	
+
+	// setup palette
+	palette.container.w = 50;
+	palette.container.h = 110;
+	palette.container.x = 10;
+	palette.container.y = 100;
+
+	palette.num_colors = 10;
+	palette.colors = calloc(palette.num_colors, sizeof(struct swatch));
+	int swatch_w = 20;
+	int swatch_h = 20;
+	int m = 0;
+
+	// setup color swatches within palette
+	for(int i = 0; i < palette.num_colors; i++) {
+		palette.colors[i].b.rect.w = swatch_w;
+		palette.colors[i].b.rect.h = swatch_h;
+		palette.colors[i].c.a = SDL_ALPHA_OPAQUE;
+		palette.colors[i].c.r = 0;
+		palette.colors[i].c.g = 0;
+		palette.colors[i].c.b = 0;
+
+		if(i % 2 == 0)
+			palette.colors[i].b.rect.x = palette.container.x + 5;
+		else
+			palette.colors[i].b.rect.x = palette.container.x + 5 + swatch_w + 1;
+		
+		palette.colors[i].b.rect.y = palette.container.y + 5 + (swatch_h * m);
+		if(i % 2 == 1) m++;
+	}
+
+	palette.colors[0].c.r = 255;
+	palette.colors[1].c.g = 255;
+	palette.colors[2].c.b = 255;
+
+	palette.colors[3].c.r = 255;
+	palette.colors[3].c.g = 255;
+
+	palette.colors[4].c.g = 255;
+	palette.colors[4].c.b = 255;
+
+	palette.colors[5].c.r = 255;
+	palette.colors[5].c.b = 255;
+
+	palette.colors[6].c.r = 255/2;
+	palette.colors[6].c.g = 255/2;
+
+	palette.colors[7].c.b = 255/2;
+	palette.colors[7].c.g = 255/2;
+
+	palette.colors[8].c.r = 255/2;
+	palette.colors[8].c.b = 255/2;
+
+	palette.colors[9].c.r = 255;
+	palette.colors[9].c.g = 255;
+	palette.colors[9].c.b = 255;
+
+
 
 	// fill the texture with white pixels
 	SDL_SetRenderTarget(renderer, canvas.texture);
@@ -219,12 +288,18 @@ void process_input() {
 					game_is_running = 0;
 				break;
 			case SDL_MOUSEBUTTONDOWN:
-				// start drawing; actual bounds-checking is done in update (after mapping)
+				// start drawing, actual bounds-checking is done in update
 				canvas.is_drawing = true;
+
+				// check if buttons were clicked
 				check_button_click(&increase_rows);
 				check_button_click(&decrease_rows);
 				check_button_click(&increase_cols);
 				check_button_click(&decrease_cols);
+
+				for(int i = 0; i < palette.num_colors; i++) {
+					check_button_click(&palette.colors[i].b);
+				}
 
 				break;
 			case SDL_MOUSEBUTTONUP:
@@ -283,6 +358,16 @@ void update() {
 		decrease_cols.clicked = false;
 	}
 
+	for(int i = 0; i < palette.num_colors; i++) {
+		if(palette.colors[i].b.clicked) {
+
+			chosen_color = palette.colors[i].c;
+
+			palette.colors[i].b.clicked = false;
+		}
+
+	}
+
 	last_frame_time = SDL_GetTicks();
 }
 
@@ -311,6 +396,13 @@ void render() {
 	SDL_RenderFillRect(renderer, &decrease_rows.rect);
 	SDL_RenderFillRect(renderer, &increase_cols.rect);
 	SDL_RenderFillRect(renderer, &decrease_cols.rect);
+
+	// render palette
+	SDL_RenderDrawRect(renderer, &palette.container);
+	for(int i = 0; i < palette.num_colors; i++) {
+		SDL_SetRenderDrawColor(renderer, palette.colors[i].c.r, palette.colors[i].c.g, palette.colors[i].c.b, palette.colors[i].c.a);
+		SDL_RenderFillRect(renderer, &palette.colors[i].b.rect);
+	}
 
 	SDL_RenderPresent(renderer);
 }
