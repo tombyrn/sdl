@@ -1,6 +1,7 @@
 #ifndef HEADER_H
 #define HEADER_H
 #include <stdio.h>
+#include <stdbool.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 
@@ -18,6 +19,7 @@
 struct player {
     SDL_Rect rect;
     int dx, dy;
+    bool jumping;
     // SDL_Texture* sprites[4];
 };
 

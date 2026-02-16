@@ -2,6 +2,7 @@
 
 void update_player(float dt) {
     p.dy += GRAVITY * dt * PLAYER_SPEED;
+    p.dx > 0 ? p.dx-- : p.dx++;
     
     // horizontal collision
     p.rect.x += p.dx * dt * PLAYER_SPEED;

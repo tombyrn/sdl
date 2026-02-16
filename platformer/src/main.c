@@ -50,6 +50,7 @@ void setup() {
 	p.rect.h = 64;
 	p.rect.x = 4 * p.rect.w;
 	p.rect.y = 3 * p.rect.h;
+	p.jumping = false;
 
 	setup_level(1);
 }
@@ -62,18 +63,34 @@ void process_input() {
 		case SDL_QUIT:
 			game_is_running = 0;
 			break;
-		case SDL_KEYDOWN:
-			if(event.key.keysym.sym == SDLK_ESCAPE)
+		case SDL_KEYDOWN: {
+			SDL_KeyCode keycode = event.key.keysym.sym;
+
+			if(keycode == SDLK_ESCAPE)
 				game_is_running = 0;
+			if(keycode == SDLK_w && p.jumping == false) {
+				p.jumping = true;
+				p.dy = -3000;
+			}
+		}
 			break;
-		
-		// PROCESS MORE INPUT HERE
+		case SDL_KEYUP: {
+			SDL_KeyCode keycode = event.key.keysym.sym;
+			if(keycode == SDLK_w)
+				p.jumping = false;
+
+		}
+			break;
+	
 	}
 
 	const Uint8* keystates = SDL_GetKeyboardState(NULL);
-	if (keystates[SDL_SCANCODE_A]) { p.dx = -5; }
-	if (keystates[SDL_SCANCODE_D]) { p.dx = 5; }
-	if (keystates[SDL_SCANCODE_W]) { p.dy = -900; }
+	if (keystates[SDL_SCANCODE_A]) { p.dx = -9; }
+	if (keystates[SDL_SCANCODE_D]) { p.dx = 9; }
+	// if (keystates[SDL_SCANCODE_W] && p.jumping == false) { 
+	// 	p.jumping = true; 
+	// 	p.dy = -900; 
+	// }
 }
 
 void update() {
